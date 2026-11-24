@@ -34,12 +34,15 @@ export type RegistrationStatus =
 
 export type ThemeMode = 'light' | 'dark';
 
+export type UserRole = 'student' | 'admin';
+
 export type ActivePage = 
   | 'dashboard' 
   | 'events' 
   | 'catalog' 
   | 'registrations' 
   | 'participants' 
+  | 'my-registrations'
   | 'settings';
 
 export type SortOrder = 'asc' | 'desc';
