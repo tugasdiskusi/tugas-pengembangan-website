@@ -248,7 +248,7 @@ function setupAuthSystem(): void {
 }
 
 /**
- * Buka modal autentikasi & render daftar akun demo
+ * Buka modal autentikasi & render daftar akun demo beserta tombol hapus
  */
 function openAuthModal(): void {
   const container = document.getElementById('auth-demo-accounts-list');
@@ -256,31 +256,67 @@ function openAuthModal(): void {
   const currentUser = AuthService.getCurrentUser();
 
   if (container) {
-    container.innerHTML = participants.map(p => {
-      const isCurrent = currentUser?.nim === p.nim;
-      return `
-        <button type="button" class="btn btn-sm ${isCurrent ? 'btn-primary' : 'btn-secondary'} btn-quick-login-item" data-nim="${p.nim}" style="padding: 4px 10px; font-size: 0.76rem;">
-          ${escapeHtml(p.name.split(' ')[0])} (${p.nim}) ${isCurrent ? '✓' : ''}
-        </button>
-      `;
-    }).join('');
+    if (participants.length === 0) {
+      container.innerHTML = `<span style="font-size: 0.8rem; color: var(--color-text-muted);">Belum ada mahasiswa terdaftar. Silakan gunakan tab 'Daftar Akun Baru'.</span>`;
+    } else {
+      container.innerHTML = participants.map(p => {
+        const isCurrent = currentUser?.nim === p.nim;
+        return `
+          <div class="demo-account-chip ${isCurrent ? 'active' : ''}">
+            <span class="demo-chip-name" data-nim="${p.nim}" title="Masuk sebagai ${escapeHtml(p.name)}">
+              ${escapeHtml(p.name.split(' ')[0])} (${p.nim}) ${isCurrent ? '✓' : ''}
+            </span>
+            <button type="button" class="demo-chip-delete" data-id="${p.id}" data-name="${escapeHtml(p.name)}" data-nim="${p.nim}" title="Hapus akun ${escapeHtml(p.name)}">
+              &times;
+            </button>
+          </div>
+        `;
+      }).join('');
 
-    // Listener klik akun demo cepat
-    container.querySelectorAll('.btn-quick-login-item').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const nim = (e.currentTarget as HTMLElement).getAttribute('data-nim');
-        if (nim) {
-          const res = AuthService.loginAsStudent(nim);
-          if (res.success) {
-            showToast(res.message, 'success');
-            updateAuthUI();
-            renderSidebarNav();
-            closeModal('modal-auth');
-            navigateTo('catalog');
+      // Listener klik untuk memilih dan login
+      container.querySelectorAll('.demo-chip-name').forEach(el => {
+        el.addEventListener('click', (e) => {
+          const nim = (e.currentTarget as HTMLElement).getAttribute('data-nim');
+          if (nim) {
+            const res = AuthService.loginAsStudent(nim);
+            if (res.success) {
+              showToast(res.message, 'success');
+              updateAuthUI();
+              renderSidebarNav();
+              closeModal('modal-auth');
+              navigateTo('catalog');
+            }
           }
-        }
+        });
       });
-    });
+
+      // Listener tombol hapus akun (×)
+      container.querySelectorAll('.demo-chip-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
+          const name = (e.currentTarget as HTMLElement).getAttribute('data-name');
+          const nim = (e.currentTarget as HTMLElement).getAttribute('data-nim');
+
+          if (id && nim && window.confirm(`Apakah Anda yakin ingin menghapus akun mahasiswa "${name}" (${nim})?`)) {
+            // Hapus dari LocalStorage
+            StorageService.deleteParticipant(id);
+
+            // Jika akun yang dihapus sedang aktif login, logout
+            if (currentUser?.id === id || currentUser?.nim === nim) {
+              AuthService.logout();
+              updateAuthUI();
+              renderSidebarNav();
+            }
+
+            showToast(`Akun mahasiswa "${name}" berhasil dihapus.`, 'info');
+
+            // Refresh daftar akun di modal
+            openAuthModal();
+          }
+        });
+      });
+    }
   }
 
   openModal('modal-auth');

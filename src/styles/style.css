@@ -1049,6 +1049,59 @@ button, input, select, textarea {
 }
 
 /* Toast Notifications */
+.demo-account-chip {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 3px 6px 3px 12px;
+  gap: 8px;
+  font-size: 0.78rem;
+  transition: all var(--transition-fast);
+}
+
+.demo-account-chip:hover {
+  border-color: var(--color-accent);
+  background-color: var(--color-border-subtle);
+}
+
+.demo-account-chip.active {
+  background-color: var(--color-primary-light);
+  border-color: var(--color-primary);
+  font-weight: 600;
+}
+
+.demo-chip-name {
+  cursor: pointer;
+  color: var(--color-text-main);
+  user-select: none;
+}
+
+.demo-chip-delete {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-danger);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+.demo-chip-delete:hover {
+  background-color: var(--color-danger);
+  color: white;
+  transform: scale(1.15);
+}
+
 .toast-container {
   position: fixed;
   bottom: 24px;

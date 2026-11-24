@@ -536,14 +536,17 @@ export class StorageService {
     return true;
   }
 
-  public static deleteParticipant(id: string): boolean {
+  public static deleteParticipant(idOrNim: string): boolean {
     const participants = this.getParticipants();
-    const updated = genericRemoveItem(participants, id);
+    const target = participants.find(p => p.id === idOrNim || p.nim === idOrNim);
+    if (!target) return false;
+
+    const updated = participants.filter(p => p.id !== target.id && p.nim !== target.nim);
     saveToStorage(STORAGE_KEYS.PARTICIPANTS, updated);
 
     // Hapus juga pendaftaran peserta terkait
     const registrations = this.getRegistrations();
-    const regToDelete = registrations.filter(r => r.participantId === id);
+    const regToDelete = registrations.filter(r => r.participantId === target.id || r.participantNim === target.nim);
     
     // Perbarui kuota acara terkait
     regToDelete.forEach(r => {
@@ -555,7 +558,7 @@ export class StorageService {
       }
     });
 
-    const updatedRegs = registrations.filter(r => r.participantId !== id);
+    const updatedRegs = registrations.filter(r => r.participantId !== target.id && r.participantNim !== target.nim);
     saveToStorage(STORAGE_KEYS.REGISTRATIONS, updatedRegs);
 
     return true;
