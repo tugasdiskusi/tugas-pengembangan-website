@@ -36,6 +36,17 @@ export type ThemeMode = 'light' | 'dark';
 
 export type UserRole = 'student' | 'admin';
 
+export interface AuthUser {
+  id: string;
+  name: string;
+  nim: string;
+  studyProgram: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  avatar?: string;
+}
+
 export type ActivePage = 
   | 'dashboard' 
   | 'events' 
