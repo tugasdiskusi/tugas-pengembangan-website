@@ -60,12 +60,6 @@
         </div>
 
         <div class="header-right">
-          <!-- Tombol Switch Role (Mahasiswa / Admin) -->
-          <button class="btn btn-secondary btn-sm" id="btn-toggle-role" style="display: flex; align-items: center; gap: 8px; font-weight: 600;">
-            <span id="role-badge-text">🎓 Mode: Mahasiswa</span>
-            <span style="font-size: 0.72rem; background: var(--color-primary-light); color: var(--color-primary); padding: 2px 6px; border-radius: var(--radius-sm);">Ganti</span>
-          </button>
-
           <!-- Toggle Theme -->
           <button class="theme-toggle-btn" id="btn-theme-toggle" aria-label="Ganti Tema">
             <svg id="theme-icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
@@ -85,17 +79,17 @@
           </button>
 
           <!-- User Profile & Auth Actions -->
-          <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
             <div class="user-profile-badge" id="header-user-badge" style="cursor: pointer;" title="Klik untuk ganti akun mahasiswa">
               <div class="user-avatar" id="header-user-avatar">MHS</div>
               <div class="user-meta">
                 <span class="name" id="header-user-name">Raden M. Fauzan</span>
-                <span class="role" id="header-user-role">Mahasiswa (2301010045)</span>
+                <span class="role" id="header-user-role">NIM: 2301010045</span>
               </div>
             </div>
 
             <!-- Tombol Login / Logout -->
-            <button class="btn btn-sm btn-secondary" id="btn-auth-action" style="padding: 7px 12px; font-size: 0.82rem; font-weight: 600;">
+            <button class="btn btn-sm btn-secondary" id="btn-auth-action" style="padding: 7px 14px; font-size: 0.82rem; font-weight: 600;">
               Keluar
             </button>
           </div>
@@ -149,12 +143,6 @@
               Masuk Sekarang
             </button>
           </form>
-
-          <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border); text-align: center;">
-            <button class="btn btn-secondary btn-sm" id="btn-login-as-admin" style="width: 100%;">
-              🛡️ Masuk sebagai Administrator Biro Kemahasiswaan
-            </button>
-          </div>
         </div>
 
         <!-- TAB 2: FORM DAFTAR MAHASISWA BARU -->

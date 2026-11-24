@@ -1,11 +1,11 @@
 // ==========================================
 // CAMPUSCONNECT - MAIN APPLICATION ENTRY POINT
-// Routing, Multi-Role, Auth (Login/Logout), & State Management
+// Routing, Unified Navigation, Auth (Login/Logout), & State Management
 // ==========================================
 
 import { StorageService } from './services/storage';
 import { AuthService } from './services/auth';
-import { ActivePage, ThemeMode, UserRole } from './types';
+import { ActivePage, ThemeMode } from './types';
 import { renderDashboard } from './pages/dashboard';
 import { renderEvents } from './pages/events';
 import { renderRegistrations } from './pages/registrations';
@@ -14,15 +14,14 @@ import { renderMyRegistrations } from './pages/myRegistrations';
 import { renderSettings } from './pages/settings';
 import { showToast, openModal, closeModal, escapeHtml } from './utils/helpers';
 
-// State Aplikasi
-let currentRole: UserRole = 'student';
-let currentPage: ActivePage = 'catalog';
+// State Halaman Aktif
+let currentPage: ActivePage = 'dashboard';
 
 // Metadata Halaman
 const PAGE_METADATA: Record<ActivePage, { title: string; desc: string }> = {
   dashboard: {
-    title: 'Dashboard Admin',
-    desc: 'Ringkasan metrik statistik dan aktivitas kegiatan kampus'
+    title: 'Dashboard Kampus',
+    desc: 'Ringkasan metrik statistik dan aktivitas kegiatan mahasiswa'
   },
   events: {
     title: 'Manajemen Acara',
@@ -37,7 +36,7 @@ const PAGE_METADATA: Record<ActivePage, { title: string; desc: string }> = {
     desc: 'Formulir pendaftaran mahasiswa dan pemantauan status'
   },
   'my-registrations': {
-    title: 'Tiket & Pendaftaran Saya',
+    title: 'Tiket & Acara Saya',
     desc: 'Pantau status pendaftaran dan e-tiket kehadiran Anda'
   },
   participants: {
@@ -57,17 +56,11 @@ function initApp(): void {
   // 1. Inisialisasi StorageService & Dummy Data
   StorageService.initialize();
 
-  // 2. Muat sesi login aktif (default mahasiswa aktif)
-  const user = AuthService.getCurrentUser();
-  if (user) {
-    currentRole = user.role;
-  }
-
-  // 3. Muat preferensi tema
+  // 2. Muat preferensi tema
   const savedTheme = StorageService.getTheme();
   applyTheme(savedTheme);
 
-  // 4. Muat Environment Variables untuk sidebar
+  // 3. Muat Environment Variables untuk sidebar
   const appName = import.meta.env.VITE_APP_NAME || 'CampusConnect';
   const appVersion = import.meta.env.VITE_APP_VERSION || '1.0.0';
 
@@ -76,20 +69,19 @@ function initApp(): void {
   if (sidebarAppName) sidebarAppName.textContent = appName;
   if (sidebarAppVersion) sidebarAppVersion.textContent = `v${appVersion}`;
 
-  // 5. Setup Sistem Autentikasi (Login & Logout)
+  // 4. Setup Sistem Autentikasi (Login & Logout)
   setupAuthSystem();
 
-  // 6. Setup Role Switcher & Render Sidebar Navigasi
-  setupRoleSwitcher();
+  // 5. Render Sidebar Navigasi Terpadu (Semua Fitur Terbuka)
   renderSidebarNav();
 
-  // 7. Setup mobile sidebar
+  // 6. Setup mobile sidebar
   setupMobileSidebar();
 
-  // 8. Setup theme toggle
+  // 7. Setup theme toggle
   setupThemeToggle();
 
-  // 9. Listen untuk navigasi custom event
+  // 8. Listen untuk navigasi custom event
   window.addEventListener('navigate', ((e: CustomEvent) => {
     const targetPage = e.detail?.page as ActivePage;
     const selectedEventId = e.detail?.selectedEventId as string | undefined;
@@ -98,9 +90,8 @@ function initApp(): void {
     }
   }) as EventListener);
 
-  // 10. Tampilkan tampilan awal (Katalog untuk mahasiswa, Dashboard untuk admin)
-  currentPage = currentRole === 'student' ? 'catalog' : 'dashboard';
-  navigateTo(currentPage);
+  // 9. Tampilkan tampilan awal Dashboard
+  navigateTo('dashboard');
 }
 
 /**
@@ -113,7 +104,7 @@ function setupAuthSystem(): void {
   // Tombol Login / Logout di Header
   authBtn?.addEventListener('click', () => {
     if (AuthService.isLoggedIn()) {
-      // Tindakan Logout
+      // Logout
       AuthService.logout();
       showToast('Anda telah keluar (Logout).', 'info');
       updateAuthUI();
@@ -173,11 +164,9 @@ function setupAuthSystem(): void {
     const res = AuthService.loginAsStudent(nimInput);
     if (res.success && res.user) {
       showToast(res.message, 'success');
-      currentRole = 'student';
       updateAuthUI();
-      renderSidebarNav();
       closeModal('modal-auth');
-      navigateTo('catalog');
+      navigateTo('dashboard');
     } else {
       showToast(res.message, 'error');
     }
@@ -201,25 +190,12 @@ function setupAuthSystem(): void {
     const res = AuthService.registerNewStudent({ name, nim, studyProgram, email, phone });
     if (res.success && res.user) {
       showToast(res.message, 'success');
-      currentRole = 'student';
       updateAuthUI();
-      renderSidebarNav();
       closeModal('modal-auth');
-      navigateTo('catalog');
+      navigateTo('dashboard');
     } else {
       showToast(res.message, 'error');
     }
-  });
-
-  // Login sebagai Admin
-  document.getElementById('btn-login-as-admin')?.addEventListener('click', () => {
-    AuthService.loginAsAdmin();
-    currentRole = 'admin';
-    showToast('Berhasil masuk sebagai Administrator Biro Kemahasiswaan.', 'success');
-    updateAuthUI();
-    renderSidebarNav();
-    closeModal('modal-auth');
-    navigateTo('dashboard');
   });
 
   updateAuthUI();
@@ -251,11 +227,9 @@ function openAuthModal(): void {
           const res = AuthService.loginAsStudent(nim);
           if (res.success) {
             showToast(res.message, 'success');
-            currentRole = 'student';
             updateAuthUI();
-            renderSidebarNav();
             closeModal('modal-auth');
-            navigateTo('catalog');
+            navigateTo('dashboard');
           }
         }
       });
@@ -274,7 +248,6 @@ function updateAuthUI(): void {
   const userAvatar = document.getElementById('header-user-avatar');
   const userName = document.getElementById('header-user-name');
   const userRole = document.getElementById('header-user-role');
-  const roleText = document.getElementById('role-badge-text');
   const roleIndicator = document.getElementById('sidebar-role-indicator');
 
   if (user) {
@@ -284,21 +257,10 @@ function updateAuthUI(): void {
       authBtn.style.color = 'var(--color-danger)';
     }
 
-    if (user.role === 'student') {
-      if (userAvatar) userAvatar.textContent = user.name.charAt(0);
-      if (userName) userName.textContent = user.name;
-      if (userRole) userRole.textContent = `NIM: ${user.nim}`;
-      if (roleText) roleText.textContent = '🎓 Mode: Mahasiswa';
-      if (roleIndicator) roleIndicator.textContent = 'Portal Mahasiswa';
-      currentRole = 'student';
-    } else {
-      if (userAvatar) userAvatar.textContent = 'ADM';
-      if (userName) userName.textContent = 'Biro Kemahasiswaan';
-      if (userRole) userRole.textContent = 'Admin Utama Kampus';
-      if (roleText) roleText.textContent = '🛡️ Mode: Admin';
-      if (roleIndicator) roleIndicator.textContent = 'Admin Kemahasiswaan';
-      currentRole = 'admin';
-    }
+    if (userAvatar) userAvatar.textContent = user.name.charAt(0);
+    if (userName) userName.textContent = user.name;
+    if (userRole) userRole.textContent = `NIM: ${user.nim}`;
+    if (roleIndicator) roleIndicator.textContent = `${user.studyProgram}`;
   } else {
     // Mode Guest / Belum Login
     if (authBtn) {
@@ -309,166 +271,101 @@ function updateAuthUI(): void {
     if (userAvatar) userAvatar.textContent = '?';
     if (userName) userName.textContent = 'Tamu / Mahasiswa';
     if (userRole) userRole.textContent = 'Klik untuk Masuk';
-    if (roleText) roleText.textContent = '🎓 Mode: Mahasiswa';
-    if (roleIndicator) roleIndicator.textContent = 'Portal Mahasiswa';
-    currentRole = 'student';
+    if (roleIndicator) roleIndicator.textContent = 'Sistem Acara Kampus';
   }
 }
 
 /**
- * Render menu navigasi sidebar sesuai role aktif (Mahasiswa vs Admin)
+ * Render menu navigasi sidebar terpadu (Semua fitur dapat diakses)
  */
 function renderSidebarNav(): void {
   const navContainer = document.getElementById('sidebar-nav-container');
   if (!navContainer) return;
 
-  if (currentRole === 'student') {
-    navContainer.innerHTML = `
-      <div class="nav-section-title">Portal Mahasiswa</div>
+  navContainer.innerHTML = `
+    <div class="nav-section-title">Menu Utama</div>
 
-      <button class="nav-item ${currentPage === 'catalog' ? 'active' : ''}" data-page="catalog">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          </svg>
-        </span>
-        <span>Katalog Acara</span>
-      </button>
+    <button class="nav-item ${currentPage === 'dashboard' ? 'active' : ''}" data-page="dashboard">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+      </span>
+      <span>Dashboard</span>
+    </button>
 
-      <button class="nav-item ${currentPage === 'registrations' ? 'active' : ''}" data-page="registrations">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <line x1="20" y1="8" x2="20" y2="14"></line>
-            <line x1="23" y1="11" x2="17" y2="11"></line>
-          </svg>
-        </span>
-        <span>Daftar Kegiatan</span>
-      </button>
+    <button class="nav-item ${currentPage === 'catalog' ? 'active' : ''}" data-page="catalog">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+      </span>
+      <span>Katalog Acara</span>
+    </button>
 
-      <button class="nav-item ${currentPage === 'my-registrations' ? 'active' : ''}" data-page="my-registrations">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
-        </span>
-        <span>Tiket &amp; Acara Saya</span>
-      </button>
+    <button class="nav-item ${currentPage === 'events' ? 'active' : ''}" data-page="events">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+      </span>
+      <span>Manajemen Acara</span>
+    </button>
 
-      <div class="nav-section-title">Lainnya</div>
+    <div class="nav-section-title">Partisipasi &amp; Pendaftaran</div>
 
-      <button class="nav-item ${currentPage === 'settings' ? 'active' : ''}" data-page="settings">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </span>
-        <span>Pengaturan</span>
-      </button>
+    <button class="nav-item ${currentPage === 'registrations' ? 'active' : ''}" data-page="registrations">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <line x1="20" y1="8" x2="20" y2="14"></line>
+          <line x1="23" y1="11" x2="17" y2="11"></line>
+        </svg>
+      </span>
+      <span>Pendaftaran Kegiatan</span>
+    </button>
 
-      <button class="nav-item" id="nav-btn-switch-admin" style="margin-top: 12px; background: rgba(37, 99, 235, 0.1); color: var(--color-accent); font-weight: 600;">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-          </svg>
-        </span>
-        <span>Beralih ke Panel Admin</span>
-      </button>
-    `;
-  } else {
-    // Mode Admin
-    navContainer.innerHTML = `
-      <div class="nav-section-title">Panel Admin Biro Kemahasiswaan</div>
+    <button class="nav-item ${currentPage === 'my-registrations' ? 'active' : ''}" data-page="my-registrations">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+      </span>
+      <span>Tiket &amp; Acara Saya</span>
+    </button>
 
-      <button class="nav-item ${currentPage === 'dashboard' ? 'active' : ''}" data-page="dashboard">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
-          </svg>
-        </span>
-        <span>Dashboard</span>
-      </button>
+    <button class="nav-item ${currentPage === 'participants' ? 'active' : ''}" data-page="participants">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+      </span>
+      <span>Manajemen Peserta</span>
+    </button>
 
-      <button class="nav-item ${currentPage === 'events' ? 'active' : ''}" data-page="events">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
-        </span>
-        <span>Manajemen Acara</span>
-      </button>
+    <div class="nav-section-title">Sistem</div>
 
-      <button class="nav-item ${currentPage === 'catalog' ? 'active' : ''}" data-page="catalog">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          </svg>
-        </span>
-        <span>Katalog Acara</span>
-      </button>
-
-      <div class="nav-section-title">Partisipasi &amp; Pendaftaran</div>
-
-      <button class="nav-item ${currentPage === 'registrations' ? 'active' : ''}" data-page="registrations">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <line x1="20" y1="8" x2="20" y2="14"></line>
-            <line x1="23" y1="11" x2="17" y2="11"></line>
-          </svg>
-        </span>
-        <span>Pendaftaran Masuk</span>
-      </button>
-
-      <button class="nav-item ${currentPage === 'participants' ? 'active' : ''}" data-page="participants">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-        </span>
-        <span>Manajemen Peserta</span>
-      </button>
-
-      <div class="nav-section-title">Sistem</div>
-
-      <button class="nav-item ${currentPage === 'settings' ? 'active' : ''}" data-page="settings">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </span>
-        <span>Pengaturan</span>
-      </button>
-
-      <button class="nav-item" id="nav-btn-switch-student" style="margin-top: 12px; background: rgba(16, 185, 129, 0.1); color: var(--color-success); font-weight: 600;">
-        <span class="nav-icon">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-            <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-          </svg>
-        </span>
-        <span>Beralih ke Portal Mahasiswa</span>
-      </button>
-    `;
-  }
+    <button class="nav-item ${currentPage === 'settings' ? 'active' : ''}" data-page="settings">
+      <span class="nav-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </span>
+      <span>Pengaturan</span>
+    </button>
+  `;
 
   // Click listeners untuk menu navigasi
   navContainer.querySelectorAll<HTMLButtonElement>('.nav-item[data-page]').forEach(btn => {
@@ -477,54 +374,6 @@ function renderSidebarNav(): void {
       if (page) navigateTo(page);
     });
   });
-
-  document.getElementById('nav-btn-switch-admin')?.addEventListener('click', () => {
-    AuthService.loginAsAdmin();
-    setRole('admin');
-  });
-
-  document.getElementById('nav-btn-switch-student')?.addEventListener('click', () => {
-    const participants = StorageService.getParticipants();
-    if (participants.length > 0) {
-      AuthService.loginAsStudent(participants[0].nim);
-    }
-    setRole('student');
-  });
-}
-
-/**
- * Setup Role Switcher (Mahasiswa vs Admin)
- */
-function setupRoleSwitcher(): void {
-  const toggleBtn = document.getElementById('btn-toggle-role');
-  toggleBtn?.addEventListener('click', () => {
-    const nextRole: UserRole = currentRole === 'student' ? 'admin' : 'student';
-    if (nextRole === 'admin') {
-      AuthService.loginAsAdmin();
-    } else {
-      const participants = StorageService.getParticipants();
-      if (participants.length > 0) {
-        AuthService.loginAsStudent(participants[0].nim);
-      }
-    }
-    setRole(nextRole);
-  });
-
-  updateAuthUI();
-}
-
-function setRole(role: UserRole): void {
-  currentRole = role;
-  updateAuthUI();
-  renderSidebarNav();
-
-  if (currentRole === 'student') {
-    showToast('Beralih ke Portal Mahasiswa (Katalog & Pendaftaran).', 'info');
-    navigateTo('catalog');
-  } else {
-    showToast('Beralih ke Panel Administrator (Dashboard Kemahasiswaan).', 'info');
-    navigateTo('dashboard');
-  }
 }
 
 /**
@@ -582,7 +431,7 @@ export function navigateTo(page: ActivePage, extraParam?: string): void {
       renderSettings(container);
       break;
     default:
-      renderEvents(container, 'cards');
+      renderDashboard(container);
       break;
   }
 
