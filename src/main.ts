@@ -1,9 +1,10 @@
 // ==========================================
 // CAMPUSCONNECT - MAIN APPLICATION ENTRY POINT
-// Routing, Multi-Role (Mahasiswa & Admin), State Management
+// Routing, Multi-Role, Auth (Login/Logout), & State Management
 // ==========================================
 
 import { StorageService } from './services/storage';
+import { AuthService } from './services/auth';
 import { ActivePage, ThemeMode, UserRole } from './types';
 import { renderDashboard } from './pages/dashboard';
 import { renderEvents } from './pages/events';
@@ -11,11 +12,11 @@ import { renderRegistrations } from './pages/registrations';
 import { renderParticipants } from './pages/participants';
 import { renderMyRegistrations } from './pages/myRegistrations';
 import { renderSettings } from './pages/settings';
-import { showToast } from './utils/helpers';
+import { showToast, openModal, closeModal, escapeHtml } from './utils/helpers';
 
 // State Aplikasi
-let currentRole: UserRole = 'student'; // Default Mode Mahasiswa sesuai permintaan user!
-let currentPage: ActivePage = 'catalog'; // Landing page default untuk mahasiswa adalah Katalog Acara
+let currentRole: UserRole = 'student';
+let currentPage: ActivePage = 'catalog';
 
 // Metadata Halaman
 const PAGE_METADATA: Record<ActivePage, { title: string; desc: string }> = {
@@ -56,11 +57,17 @@ function initApp(): void {
   // 1. Inisialisasi StorageService & Dummy Data
   StorageService.initialize();
 
-  // 2. Muat preferensi tema
+  // 2. Muat sesi login aktif (default mahasiswa aktif)
+  const user = AuthService.getCurrentUser();
+  if (user) {
+    currentRole = user.role;
+  }
+
+  // 3. Muat preferensi tema
   const savedTheme = StorageService.getTheme();
   applyTheme(savedTheme);
 
-  // 3. Muat Environment Variables untuk sidebar
+  // 4. Muat Environment Variables untuk sidebar
   const appName = import.meta.env.VITE_APP_NAME || 'CampusConnect';
   const appVersion = import.meta.env.VITE_APP_VERSION || '1.0.0';
 
@@ -69,17 +76,20 @@ function initApp(): void {
   if (sidebarAppName) sidebarAppName.textContent = appName;
   if (sidebarAppVersion) sidebarAppVersion.textContent = `v${appVersion}`;
 
-  // 4. Setup Role Switcher & Render Sidebar Navigasi
+  // 5. Setup Sistem Autentikasi (Login & Logout)
+  setupAuthSystem();
+
+  // 6. Setup Role Switcher & Render Sidebar Navigasi
   setupRoleSwitcher();
   renderSidebarNav();
 
-  // 5. Setup mobile sidebar
+  // 7. Setup mobile sidebar
   setupMobileSidebar();
 
-  // 6. Setup theme toggle
+  // 8. Setup theme toggle
   setupThemeToggle();
 
-  // 7. Listen untuk navigasi custom event
+  // 9. Listen untuk navigasi custom event
   window.addEventListener('navigate', ((e: CustomEvent) => {
     const targetPage = e.detail?.page as ActivePage;
     const selectedEventId = e.detail?.selectedEventId as string | undefined;
@@ -88,8 +98,221 @@ function initApp(): void {
     }
   }) as EventListener);
 
-  // 8. Tampilkan tampilan awal untuk Mahasiswa
+  // 10. Tampilkan tampilan awal (Katalog untuk mahasiswa, Dashboard untuk admin)
+  currentPage = currentRole === 'student' ? 'catalog' : 'dashboard';
   navigateTo(currentPage);
+}
+
+/**
+ * Setup Sistem Autentikasi (Modal Login, Register, Logout)
+ */
+function setupAuthSystem(): void {
+  const authBtn = document.getElementById('btn-auth-action');
+  const userBadge = document.getElementById('header-user-badge');
+
+  // Tombol Login / Logout di Header
+  authBtn?.addEventListener('click', () => {
+    if (AuthService.isLoggedIn()) {
+      // Tindakan Logout
+      AuthService.logout();
+      showToast('Anda telah keluar (Logout).', 'info');
+      updateAuthUI();
+      renderSidebarNav();
+      navigateTo('catalog');
+      openAuthModal();
+    } else {
+      openAuthModal();
+    }
+  });
+
+  // Klik badge profil juga membuka modal ganti akun
+  userBadge?.addEventListener('click', () => {
+    openAuthModal();
+  });
+
+  // Modal Close
+  document.getElementById('btn-close-auth-modal')?.addEventListener('click', () => {
+    closeModal('modal-auth');
+  });
+
+  // Tab Switcher Login vs Register
+  const tabLogin = document.getElementById('tab-auth-login');
+  const tabRegister = document.getElementById('tab-auth-register');
+  const viewLogin = document.getElementById('auth-view-login');
+  const viewRegister = document.getElementById('auth-view-register');
+
+  tabLogin?.addEventListener('click', () => {
+    tabLogin.style.borderBottom = '2px solid var(--color-primary)';
+    tabLogin.style.color = 'var(--color-primary)';
+    tabLogin.style.background = 'var(--color-bg-surface)';
+    tabRegister!.style.borderBottom = 'none';
+    tabRegister!.style.color = 'var(--color-text-muted)';
+    tabRegister!.style.background = 'transparent';
+    viewLogin!.style.display = 'block';
+    viewRegister!.style.display = 'none';
+  });
+
+  tabRegister?.addEventListener('click', () => {
+    tabRegister.style.borderBottom = '2px solid var(--color-primary)';
+    tabRegister.style.color = 'var(--color-primary)';
+    tabRegister.style.background = 'var(--color-bg-surface)';
+    tabLogin!.style.borderBottom = 'none';
+    tabLogin!.style.color = 'var(--color-text-muted)';
+    tabLogin!.style.background = 'transparent';
+    viewRegister!.style.display = 'block';
+    viewLogin!.style.display = 'none';
+  });
+
+  // Form Submit Login Mahasiswa
+  const formLogin = document.getElementById('form-login-student') as HTMLFormElement;
+  formLogin?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const nimInput = (document.getElementById('login-input-nim') as HTMLInputElement).value.trim();
+    if (!nimInput) return;
+
+    const res = AuthService.loginAsStudent(nimInput);
+    if (res.success && res.user) {
+      showToast(res.message, 'success');
+      currentRole = 'student';
+      updateAuthUI();
+      renderSidebarNav();
+      closeModal('modal-auth');
+      navigateTo('catalog');
+    } else {
+      showToast(res.message, 'error');
+    }
+  });
+
+  // Form Submit Register Mahasiswa Baru
+  const formRegister = document.getElementById('form-register-new-student') as HTMLFormElement;
+  formRegister?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = (document.getElementById('regnew-name') as HTMLInputElement).value.trim();
+    const nim = (document.getElementById('regnew-nim') as HTMLInputElement).value.trim();
+    const studyProgram = (document.getElementById('regnew-prodi') as HTMLSelectElement).value;
+    const email = (document.getElementById('regnew-email') as HTMLInputElement).value.trim();
+    const phone = (document.getElementById('regnew-phone') as HTMLInputElement).value.trim();
+
+    if (!name || !nim || !studyProgram || !email || !phone) {
+      showToast('Lengkapi semua data pendaftaran akun!', 'warning');
+      return;
+    }
+
+    const res = AuthService.registerNewStudent({ name, nim, studyProgram, email, phone });
+    if (res.success && res.user) {
+      showToast(res.message, 'success');
+      currentRole = 'student';
+      updateAuthUI();
+      renderSidebarNav();
+      closeModal('modal-auth');
+      navigateTo('catalog');
+    } else {
+      showToast(res.message, 'error');
+    }
+  });
+
+  // Login sebagai Admin
+  document.getElementById('btn-login-as-admin')?.addEventListener('click', () => {
+    AuthService.loginAsAdmin();
+    currentRole = 'admin';
+    showToast('Berhasil masuk sebagai Administrator Biro Kemahasiswaan.', 'success');
+    updateAuthUI();
+    renderSidebarNav();
+    closeModal('modal-auth');
+    navigateTo('dashboard');
+  });
+
+  updateAuthUI();
+}
+
+/**
+ * Buka modal autentikasi & render daftar akun demo
+ */
+function openAuthModal(): void {
+  const container = document.getElementById('auth-demo-accounts-list');
+  const participants = StorageService.getParticipants();
+  const currentUser = AuthService.getCurrentUser();
+
+  if (container) {
+    container.innerHTML = participants.map(p => {
+      const isCurrent = currentUser?.nim === p.nim;
+      return `
+        <button type="button" class="btn btn-sm ${isCurrent ? 'btn-primary' : 'btn-secondary'} btn-quick-login-item" data-nim="${p.nim}" style="padding: 4px 10px; font-size: 0.76rem;">
+          ${escapeHtml(p.name.split(' ')[0])} (${p.nim}) ${isCurrent ? '✓' : ''}
+        </button>
+      `;
+    }).join('');
+
+    // Listener klik akun demo cepat
+    container.querySelectorAll('.btn-quick-login-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const nim = (e.currentTarget as HTMLElement).getAttribute('data-nim');
+        if (nim) {
+          const res = AuthService.loginAsStudent(nim);
+          if (res.success) {
+            showToast(res.message, 'success');
+            currentRole = 'student';
+            updateAuthUI();
+            renderSidebarNav();
+            closeModal('modal-auth');
+            navigateTo('catalog');
+          }
+        }
+      });
+    });
+  }
+
+  openModal('modal-auth');
+}
+
+/**
+ * Perbarui UI Header & Identitas berdasarkan status login
+ */
+function updateAuthUI(): void {
+  const user = AuthService.getCurrentUser();
+  const authBtn = document.getElementById('btn-auth-action');
+  const userAvatar = document.getElementById('header-user-avatar');
+  const userName = document.getElementById('header-user-name');
+  const userRole = document.getElementById('header-user-role');
+  const roleText = document.getElementById('role-badge-text');
+  const roleIndicator = document.getElementById('sidebar-role-indicator');
+
+  if (user) {
+    if (authBtn) {
+      authBtn.textContent = 'Keluar';
+      authBtn.className = 'btn btn-sm btn-secondary';
+      authBtn.style.color = 'var(--color-danger)';
+    }
+
+    if (user.role === 'student') {
+      if (userAvatar) userAvatar.textContent = user.name.charAt(0);
+      if (userName) userName.textContent = user.name;
+      if (userRole) userRole.textContent = `NIM: ${user.nim}`;
+      if (roleText) roleText.textContent = '🎓 Mode: Mahasiswa';
+      if (roleIndicator) roleIndicator.textContent = 'Portal Mahasiswa';
+      currentRole = 'student';
+    } else {
+      if (userAvatar) userAvatar.textContent = 'ADM';
+      if (userName) userName.textContent = 'Biro Kemahasiswaan';
+      if (userRole) userRole.textContent = 'Admin Utama Kampus';
+      if (roleText) roleText.textContent = '🛡️ Mode: Admin';
+      if (roleIndicator) roleIndicator.textContent = 'Admin Kemahasiswaan';
+      currentRole = 'admin';
+    }
+  } else {
+    // Mode Guest / Belum Login
+    if (authBtn) {
+      authBtn.textContent = 'Masuk';
+      authBtn.className = 'btn btn-sm btn-primary';
+      authBtn.style.color = 'white';
+    }
+    if (userAvatar) userAvatar.textContent = '?';
+    if (userName) userName.textContent = 'Tamu / Mahasiswa';
+    if (userRole) userRole.textContent = 'Klik untuk Masuk';
+    if (roleText) roleText.textContent = '🎓 Mode: Mahasiswa';
+    if (roleIndicator) roleIndicator.textContent = 'Portal Mahasiswa';
+    currentRole = 'student';
+  }
 }
 
 /**
@@ -143,7 +366,7 @@ function renderSidebarNav(): void {
         <span class="nav-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
           </svg>
         </span>
         <span>Pengaturan</span>
@@ -229,7 +452,7 @@ function renderSidebarNav(): void {
         <span class="nav-icon">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
           </svg>
         </span>
         <span>Pengaturan</span>
@@ -247,7 +470,7 @@ function renderSidebarNav(): void {
     `;
   }
 
-  // Setup click listeners pada tombol navigasi
+  // Click listeners untuk menu navigasi
   navContainer.querySelectorAll<HTMLButtonElement>('.nav-item[data-page]').forEach(btn => {
     btn.addEventListener('click', () => {
       const page = btn.getAttribute('data-page') as ActivePage;
@@ -256,10 +479,15 @@ function renderSidebarNav(): void {
   });
 
   document.getElementById('nav-btn-switch-admin')?.addEventListener('click', () => {
+    AuthService.loginAsAdmin();
     setRole('admin');
   });
 
   document.getElementById('nav-btn-switch-student')?.addEventListener('click', () => {
+    const participants = StorageService.getParticipants();
+    if (participants.length > 0) {
+      AuthService.loginAsStudent(participants[0].nim);
+    }
     setRole('student');
   });
 }
@@ -271,45 +499,31 @@ function setupRoleSwitcher(): void {
   const toggleBtn = document.getElementById('btn-toggle-role');
   toggleBtn?.addEventListener('click', () => {
     const nextRole: UserRole = currentRole === 'student' ? 'admin' : 'student';
+    if (nextRole === 'admin') {
+      AuthService.loginAsAdmin();
+    } else {
+      const participants = StorageService.getParticipants();
+      if (participants.length > 0) {
+        AuthService.loginAsStudent(participants[0].nim);
+      }
+    }
     setRole(nextRole);
   });
 
-  updateRoleUI();
+  updateAuthUI();
 }
 
 function setRole(role: UserRole): void {
   currentRole = role;
-  updateRoleUI();
+  updateAuthUI();
   renderSidebarNav();
 
   if (currentRole === 'student') {
-    showToast('Beralih ke Mode Mahasiswa (Portal Acara & Pendaftaran).', 'info');
+    showToast('Beralih ke Portal Mahasiswa (Katalog & Pendaftaran).', 'info');
     navigateTo('catalog');
   } else {
-    showToast('Beralih ke Mode Admin (Dashboard Biro Kemahasiswaan).', 'info');
+    showToast('Beralih ke Panel Administrator (Dashboard Kemahasiswaan).', 'info');
     navigateTo('dashboard');
-  }
-}
-
-function updateRoleUI(): void {
-  const roleText = document.getElementById('role-badge-text');
-  const roleIndicator = document.getElementById('sidebar-role-indicator');
-  const userAvatar = document.getElementById('header-user-avatar');
-  const userName = document.getElementById('header-user-name');
-  const userRole = document.getElementById('header-user-role');
-
-  if (currentRole === 'student') {
-    if (roleText) roleText.textContent = '🎓 Mode: Mahasiswa';
-    if (roleIndicator) roleIndicator.textContent = 'Portal Mahasiswa';
-    if (userAvatar) userAvatar.textContent = 'MHS';
-    if (userName) userName.textContent = 'Raden M. Fauzan';
-    if (userRole) userRole.textContent = 'Mahasiswa (2301010045)';
-  } else {
-    if (roleText) roleText.textContent = '🛡️ Mode: Admin';
-    if (roleIndicator) roleIndicator.textContent = 'Admin Kemahasiswaan';
-    if (userAvatar) userAvatar.textContent = 'ADM';
-    if (userName) userName.textContent = 'Biro Kemahasiswaan';
-    if (userRole) userRole.textContent = 'Admin Utama Kampus';
   }
 }
 

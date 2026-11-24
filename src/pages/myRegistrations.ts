@@ -4,20 +4,18 @@
 // ==========================================
 
 import { StorageService } from '../services/storage';
+import { AuthService } from '../services/auth';
 import { formatDate, formatTime, renderRegistrationStatusBadge, showToast, escapeHtml } from '../utils/helpers';
-
-let currentStudentNim = '2301010045'; // Default student NIM (Raden Muhammad Fauzan)
 
 export function renderMyRegistrations(container: HTMLElement): void {
   const allRegistrations = StorageService.getRegistrations();
   const allEvents = StorageService.getEvents();
   const participants = StorageService.getParticipants();
+  const currentUser = AuthService.getCurrentUser();
 
-  // Ambil data mahasiswa aktif
-  const currentParticipant = participants.find(p => p.nim === currentStudentNim) || participants[0];
-  if (currentParticipant) {
-    currentStudentNim = currentParticipant.nim;
-  }
+  // Ambil data mahasiswa aktif dari sesi login
+  let currentStudentNim = currentUser?.nim || '2301010045';
+  let currentParticipant = participants.find(p => p.nim === currentStudentNim) || participants[0];
 
   const myRegistrations = allRegistrations.filter(r => r.participantNim === currentStudentNim);
 

@@ -4,6 +4,7 @@
 // ==========================================
 
 import { StorageService } from '../services/storage';
+import { AuthService } from '../services/auth';
 import { RegistrationStatus, genericSearch } from '../types';
 import {
   formatDate,
@@ -24,6 +25,8 @@ let currentRegEventFilter = 'all';
 export function renderRegistrations(container: HTMLElement, preselectedEventId?: string): void {
   const events = StorageService.getEvents();
   const availableEvents = events.filter(e => e.status === 'Upcoming' || e.status === 'Ongoing');
+  const currentUser = AuthService.getCurrentUser();
+  const isStudent = currentUser?.role === 'student';
 
   container.innerHTML = `
     <!-- Top Action Grid -->
@@ -33,7 +36,7 @@ export function renderRegistrations(container: HTMLElement, preselectedEventId?:
         <div class="card-header-flex">
           <div>
             <h2 class="card-title">Formulir Pendaftaran Kegiatan</h2>
-            <p class="card-subtitle">Silakan isi identitas mahasiswa dengan benar dan valid</p>
+            <p class="card-subtitle">${isStudent ? `Terhubung sebagai <strong>${escapeHtml(currentUser.name)} (${currentUser.nim})</strong>` : 'Silakan isi identitas mahasiswa dengan benar dan valid'}</p>
           </div>
           <span class="badge badge-upcoming">Pendaftaran Terbuka</span>
         </div>
@@ -60,12 +63,12 @@ export function renderRegistrations(container: HTMLElement, preselectedEventId?:
           <div class="form-grid-2">
             <div class="form-group">
               <label class="form-label">Nama Lengkap Mahasiswa <span class="required">*</span></label>
-              <input type="text" id="reg-student-name" class="form-control" placeholder="Contoh: Raden Muhammad Fauzan" required />
+              <input type="text" id="reg-student-name" class="form-control" placeholder="Contoh: Raden Muhammad Fauzan" value="${escapeHtml(isStudent ? currentUser.name : '')}" required />
             </div>
 
             <div class="form-group">
               <label class="form-label">Nomor Induk Mahasiswa (NIM) <span class="required">*</span></label>
-              <input type="text" id="reg-student-nim" class="form-control" placeholder="Contoh: 2301010045" required />
+              <input type="text" id="reg-student-nim" class="form-control" placeholder="Contoh: 2301010045" value="${escapeHtml(isStudent ? currentUser.nim : '')}" required />
               <div class="form-help">Minimal 6-14 karakter alfanumerik</div>
             </div>
           </div>
@@ -73,27 +76,26 @@ export function renderRegistrations(container: HTMLElement, preselectedEventId?:
           <div class="form-group">
             <label class="form-label">Program Studi <span class="required">*</span></label>
             <select id="reg-student-prodi" class="form-control" required>
-              <option value="" disabled selected>-- Pilih Program Studi --</option>
-              <option value="Teknik Informatika">Teknik Informatika</option>
-              <option value="Sistem Informasi">Sistem Informasi</option>
-              <option value="Teknik Komputer">Teknik Komputer</option>
-              <option value="Sains Data">Sains Data</option>
-              <option value="Desain Komunikasi Visual">Desain Komunikasi Visual</option>
-              <option value="Manajemen Bisnis">Manajemen Bisnis</option>
-              <option value="Teknik Elektro">Teknik Elektro</option>
-              <option value="Ilmu Komunikasi">Ilmu Komunikasi</option>
+              <option value="" disabled ${!isStudent ? 'selected' : ''}>-- Pilih Program Studi --</option>
+              ${[
+                'Teknik Informatika', 'Sistem Informasi', 'Teknik Komputer',
+                'Sains Data', 'Desain Komunikasi Visual', 'Manajemen Bisnis',
+                'Teknik Elektro', 'Ilmu Komunikasi'
+              ].map(prodi => `
+                <option value="${prodi}" ${isStudent && currentUser.studyProgram === prodi ? 'selected' : ''}>${prodi}</option>
+              `).join('')}
             </select>
           </div>
 
           <div class="form-grid-2">
             <div class="form-group">
               <label class="form-label">Email Kampus / Aktif <span class="required">*</span></label>
-              <input type="email" id="reg-student-email" class="form-control" placeholder="nama@student.campus.ac.id" required />
+              <input type="email" id="reg-student-email" class="form-control" placeholder="nama@student.campus.ac.id" value="${escapeHtml(isStudent ? currentUser.email : '')}" required />
             </div>
 
             <div class="form-group">
               <label class="form-label">Nomor WhatsApp / Telepon <span class="required">*</span></label>
-              <input type="tel" id="reg-student-phone" class="form-control" placeholder="081234567890" required />
+              <input type="tel" id="reg-student-phone" class="form-control" placeholder="081234567890" value="${escapeHtml(isStudent ? currentUser.phone : '')}" required />
             </div>
           </div>
 
