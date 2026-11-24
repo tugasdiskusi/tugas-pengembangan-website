@@ -109,12 +109,15 @@
         <button class="modal-close-btn" id="btn-close-auth-modal">&times;</button>
       </div>
 
-      <!-- Auth Tabs: Login vs Register -->
+      <!-- Auth Tabs: Login Mahasiswa vs Login Admin vs Register -->
       <div style="display: flex; border-bottom: 1px solid var(--color-border); background: var(--color-bg-app);">
-        <button id="tab-auth-login" class="btn" style="flex: 1; border-radius: 0; border: none; border-bottom: 2px solid var(--color-primary); background: var(--color-bg-surface); font-weight: 700; color: var(--color-primary);">
-          Masuk Mahasiswa
+        <button id="tab-auth-login" class="btn" style="flex: 1; border-radius: 0; border: none; border-bottom: 2px solid var(--color-primary); background: var(--color-bg-surface); font-weight: 700; color: var(--color-primary); font-size: 0.82rem; padding: 10px 6px;">
+          Mahasiswa
         </button>
-        <button id="tab-auth-register" class="btn" style="flex: 1; border-radius: 0; border: none; background: transparent; font-weight: 600; color: var(--color-text-muted);">
+        <button id="tab-auth-admin" class="btn" style="flex: 1; border-radius: 0; border: none; background: transparent; font-weight: 600; color: var(--color-text-muted); font-size: 0.82rem; padding: 10px 6px;">
+          Admin Kemahasiswaan
+        </button>
+        <button id="tab-auth-register" class="btn" style="flex: 1; border-radius: 0; border: none; background: transparent; font-weight: 600; color: var(--color-text-muted); font-size: 0.82rem; padding: 10px 6px;">
           Daftar Akun Baru
         </button>
       </div>
@@ -190,6 +193,24 @@
               Daftar &amp; Langsung Masuk
             </button>
           </form>
+        </div>
+
+        <!-- TAB 3: LOGIN ADMINISTRATOR BIRO KEMAHASISWAAN -->
+        <div id="auth-view-admin" style="display: none; text-align: center; padding: 16px 8px;">
+          <div style="width: 56px; height: 56px; border-radius: var(--radius-full); background: rgba(37, 99, 235, 0.1); color: var(--color-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+          </div>
+          <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--color-text-main); margin-bottom: 6px;">
+            Portal Administrator Kemahasiswaan
+          </h3>
+          <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 20px; line-height: 1.5;">
+            Masuk sebagai Biro Kemahasiswaan &amp; Alumni untuk mengelola seluruh data acara, persetujuan pendaftaran mahasiswa, dan statistik analitik kampus.
+          </p>
+          <button class="btn btn-primary" id="btn-login-as-admin-confirm" style="width: 100%; padding: 12px; font-weight: 600;">
+            🛡️ Masuk ke Dashboard Administrator
+          </button>
         </div>
       </div>
     </div>

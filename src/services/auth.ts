@@ -24,9 +24,17 @@ export class AuthService {
    * Mengambil data pengguna yang sedang login saat ini
    */
   public static getCurrentUser(): AuthUser | null {
+    // Cek apakah parameter URL menentukan portal
+    const params = new URLSearchParams(window.location.search);
+    const portalParam = params.get('portal');
+    
+    if (portalParam === 'admin') {
+      return DEFAULT_ADMIN;
+    }
+
     const user = loadFromStorage<AuthUser | null>(AUTH_KEY, null);
     if (!user) {
-      // Default auto-login sebagai mahasiswa awal (Raden Muhammad Fauzan) agar langsung bisa eksplorasi
+      // Default mahasiswa
       const participants = StorageService.getParticipants();
       if (participants.length > 0) {
         const defaultStudent = participants[0];
